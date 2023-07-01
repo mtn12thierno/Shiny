@@ -4,7 +4,8 @@ library(psych)
 library(ggplot2)
 library(haven)
 library(dplyr)
-
+library(foreign)
+library(shinyFiles)
 
 
 shinyApp(
@@ -19,7 +20,7 @@ shinyApp(
         #Définir ce qui sera dans la partie gauche
         menuItem("préparation des données", tabName = "prepa", icon = icon("database"),
                  menuSubItem("base de données", tabName = "option1"),
-                 menuSubItem("caractéristique des données", tabName = "option2"),
+                 menuSubItem("caractéristique des données", tabName = "option2")),
         menuItem("Analyse descriptive", tabName = "ad", icon = icon("pen"),
                  menuSubItem("Statistique univariée", tabName = "Des1"),
                  menuSubItem("Statistique bivariée", tabName = "Des2"),
@@ -130,11 +131,27 @@ shinyApp(
        ),
        tabsetPanel(
          tabPanel("Apurement et variables d'intêret", 
-                  actionButton("submit_ehcvm", "générer le tableau"),
+                          actionButton("submit_ehcvm", "générer le tableau"),
+                  div(class = "row",
+                      div(class = "col-sm-6",
+                          textInput("chemin", label = "chemin d'accés", value="C:/Users/user/Desktop")
+                      ),
+                      div(class = "col-sm-6",
+                          actionButton("export_csv", "Exporter")
+                      )
+                  ),
                   dataTableOutput("table_ehcvm")
                   ),
          tabPanel("Revenu non agricole",
                   actionButton("submit_ehcvm1", "générer le tableau"),
+                  div(class = "row",
+                      div(class = "col-sm-6",
+                          textInput("chemin1", label = "chemin d'accés", value="C:/Users/user/Desktop")
+                      ),
+                      div(class = "col-sm-6",
+                          actionButton("export_csv1", "Exporter")
+                      )
+                  ),
                   dataTableOutput("table_ehcvm1")),
        )
       )
@@ -145,6 +162,8 @@ shinyApp(
   ),
 
   server = function(input, output, session) {
+      options(shiny.maxRequestSize = 100*1024^2)  
+    
     data <- reactive({
       infile <- input$file1
       if (is.null(infile)) {
@@ -158,79 +177,129 @@ shinyApp(
       if (is.null(infile)) {
         return(NULL)
       }
-      read_dta(infile$datapath)
+      df <- read_dta(infile$datapath)
+      return(df)
     })
     
+    data_10a_subset <- reactive({
+      data_subset <- data1()
+      if (!is.null(data_subset)) {
+        vars_of_interest <- c('interview__key', 's10q01', 's10q02', 's10q03', 's10q04', 's10q05',
+                              's10q06', 's10q07', 's10q08', 's10q09', 's10q10') 
+        return(data_subset[, vars_of_interest, drop = FALSE])
+      } else {
+        return(NULL)
+      }
+    })
+    
+    # Chargement complet de la base de données
     data2 <- reactive({
       infile <- input$file3
       if (is.null(infile)) {
         return(NULL)
       }
-      read_dta(infile$datapath)
+      df <- read_dta(infile$datapath)
+      return(df)
     })
     
-      # observeEvent(input$submit_ehcvm, {
-      # 
-      # data_10b_subset <- reactive({
-      #   data_subset <- data2()
-      #   if (!is.null(data_subset))
-      #     data_subset %>% select(
-      #       'interview__key', 's10q12a', 's10q16', 's10q17a',
-      #                                   's10q17b', 's10q17c','s10q23', 's10q28', 's10q29', 's10q30', 's10q31', 's10q32',
-      #                                   's10q33', 's10q34', 's10q46', 's10q47', 's10q48', 's10q49', 's10q50', 's10q51',
-      #                                    's10q52', 's10q53', 's10q54', 's10q55', 's10q56', 's10q57')
-      #   else
-      #     NULL
-      # })
-      # 
-      # ## Renaming the variables
-      # new_names_10b <- c('interview_key', 'Activity', 'Product', 'Section_Code', 'Branch_Code', 'Activity_Code', 'Activity_local',
-      #                    'Phone_number', 'Accounting', 'Taxation_phone', 'RC_Registered', 'Person_registered', 'Legal_form',
-      #                    'Finance_source', 'Sold_product', 'Buy_product', 'Profit_product', 'Raw_materials_buy', 'Profit_services',
-      #                    'Other_CI', 'Home_spending', 'Services_fees', 'Other_spending', 'Patente', 'Taxes', 'Admin_fees')
-      # 
-      # colnames(data_10b_subset()) <- new_names_10b
-      # 
-      # variables_avant_sold_product <- c('interview_key', 'Activity', 'Product', 'Section_Code', 'Branch_Code', 'Activity_Code',
-      #                                   'Activity_local', 'Phone_number', 'Accounting', 'Taxation_phone', 'RC_Registered',
-      #                                   'Person_registered', 'Legal_form', 'Finance_source')
-      # 
-      # variables_apres_sold_product <- c('Sold_product', 'Buy_product', 'Profit_product', 'Raw_materials_buy', 'Profit_services',
-      #                                   'Other_CI', 'Home_spending', 'Services_fees', 'Other_spending', 'Patente', 'Taxes', 'Admin_fees')
-      # 
-      # # Remplacer les valeurs manquantes par des chaînes vides pour les variables avant 'Sold_product'
-      # data_10b_subset <- data_10b_subset() %>%
-      #   mutate(across(all_of(variables_avant_sold_product), ~ ifelse(is.na(.), "", as.character(.))))
-      # 
-      # # Remplacer les valeurs manquantes par des zéros pour les variables après 'Sold_product'
-      # data_10b_subset <- data_10b_subset %>%
-      #   mutate(across(all_of(variables_apres_sold_product), ~ ifelse(is.na(.), 0, as.numeric(.))))
-      # 
-      # ## Now for the 10a base
-      # 
-      # data_10a_subset <- reactive({
-      #   data_subset <- data1()
-      #   if (!is.null(data_subset))
-      #     data_subset %>% select('interview__key', 's10q01', 's10q02', 's10q03', 's10q04', 's10q05',
-      #                            's10q06', 's10q07', 's10q08', 's10q09', 's10q10', 's10q11')
-      #   else
-      #     NULL
-      # })
-      # 
-      # ## Renaming the variables
-      # new_names_10a <- c('interview_key', 'Demographics', 'Study_level', 'Marital_status', 'Social_status', 'Gender',
-      #                    'Employment_status', 'Residence_type', 'Location_type', 'Location_size', 'Region', 'Year')
-      # 
-      # colnames(data_10a_subset()) <- new_names_10a
-      # 
-      # ## Merging the two datasets
-      # data <- merge(data_10b_subset, data_10a_subset(), by = 'interview_key', all.x = TRUE)
-      # 
-      # output$table_ehcvm <- renderDataTable({
-      #   data
-      # })
-      # })
-
+    data_10b_subset <- reactive({
+      data_subset <- data2()
+      if (!is.null(data_subset)) {
+        vars_of_interest <- c('interview__key', 's10q12a', 's10q16', 's10q17a',
+                              's10q17b', 's10q17c','s10q23', 's10q28', 's10q29', 's10q30', 's10q31', 's10q32',
+                              's10q33', 's10q34', 's10q46', 's10q47', 's10q48', 's10q49', 's10q50', 's10q51',
+                              's10q52', 's10q53', 's10q54', 's10q55', 's10q56', 's10q57') 
+        return(data_subset[, vars_of_interest, drop = FALSE])
+      } else {
+        return(NULL)
+      }
+    })
+    
+    observeEvent(input$submit_ehcvm, {
+      
+      data_subset_10b <- data_10b_subset()
+      
+      if (!is.null(data_subset_10b)) {
+        ## Renaming the variables
+        new_names_10b <- c('interview_key', 'Activity', 'Product', 'Section_Code', 'Branch_Code', 'Activity_Code', 'Activity_local',
+                           'Phone_number', 'Accounting', 'Taxation_phone', 'RC_Registered', 'Person_registered', 'Legal_form',
+                           'Finance_source', 'Sold_product', 'Buy_product', 'Profit_product', 'Raw_materials_buy', 'Profit_services',
+                           'Other_CI', 'Home_spending', 'Services_fees', 'Other_spending', 'Patente', 'Taxes', 'Admin_fees')
+        
+        colnames(data_subset_10b) <- new_names_10b
+        
+        variables_avant_sold_product <- c('interview_key', 'Activity', 'Product', 'Section_Code', 'Branch_Code', 'Activity_Code',
+                                          'Activity_local', 'Phone_number', 'Accounting', 'Taxation_phone', 'RC_Registered',
+                                          'Person_registered', 'Legal_form', 'Finance_source')
+        
+        variables_apres_sold_product <- c('Sold_product', 'Buy_product', 'Profit_product', 'Raw_materials_buy', 'Profit_services',
+                                          'Other_CI', 'Home_spending', 'Services_fees', 'Other_spending', 'Patente', 'Taxes', 'Admin_fees')
+        
+        # Remplacer les valeurs manquantes par des chaînes vides pour les variables avant 'Sold_product'
+        data_subset_10b <- data_subset_10b %>%
+          mutate(across(all_of(variables_avant_sold_product), ~ ifelse(is.na(.), "", as.character(.))))
+        
+        # Remplacer les valeurs manquantes par des zéros pour les variables après 'Sold_product'
+        data_subset_10b <- data_subset_10b %>%
+          mutate(across(all_of(variables_apres_sold_product), ~ ifelse(is.na(.), 0, as.numeric(.))))
+      }
+      
+      ## Now for the 10a base
+      ## Renaming the variables
+      new_names_10a <- c('interview_key', 'Demographics', 'Study_level', 'Marital_status', 'Social_status', 'Gender',
+                         'Employment_status', 'Residence_type', 'Location_type', 'Location_size', 'Region', 'Year')
+      
+      # Replace the column names of data_10a_subset() with new_names_10a
+      data_subset_10a=data_10a_subset()
+      colnames(data_subset_10a) <- new_names_10a
+      
+      ## Merging the two datasets
+      data_10 <- merge(data_subset_10b, data_subset_10a, by = 'interview_key', all.x = TRUE)
+      data_10 <- data_10[complete.cases(data_10), ]
+      
+      output$table_ehcvm <- renderDataTable({
+        data_10
+      })
+    
+      observeEvent(input$export_csv, {
+        if (!is.null(data_10)) {
+           if(input$chemin!= ""){
+             write.csv(data_10,paste0(input$chemin,"/EHCVM.csv"), row.names = FALSE)
+             showNotification("La base de données a été exportée au format CSV.")
+           } else {
+             showNotification("veuillez mettre le chemin d'accés")
+           }
+          
+        }
+      })
+      
+    })
+    
+    observeEvent(input$submit_ehcvm1,{
+      c('Sold_product', 'Buy_product', 'Profit_product', 'Raw_materials_buy', 'Profit_services', 'Other_CI', 'Home_spending', 'Services_fees', 'Other_spending', 'Patente', 'Taxes', 'Admin_fees')
+      
+      data_10$Revenu_Non_agricole = data_10$Sold_product - data_10$Buy_product + data_10$Profit_product - data_10$Raw_materials_buy +
+        data_10$Profit_services - data_10$Other_CI - data_10$Home_spending - data_10$Services_fees -data_10$Other_spending - 
+        data_10$Patente - data_10$Taxes - data_10$Admin_fees
+      Revenu_menage <- aggregate(data_10$Revenu_Non_agricole, by = list(interview_key = data_10$interview_key), FUN = sum)
+      colnames(Revenu_menage)=c("Id_ménage", "Revenu non agricole")
+      output$table_ehcvm1 <- renderDataTable({
+        Revenu_menage
+      })
+      
+      observeEvent(input$export_csv1, {
+        if (!is.null(Revenu_menage)) {
+          if(input$chemin!= ""){
+            write.csv(Revenu_menage,paste0(input$chemin,"/Revenu_non_agricole.csv"), row.names = FALSE)
+            showNotification("La base de données a été exportée au format CSV.")
+          } else {
+            showNotification("veuillez mettre le chemin d'accés")
+          }
+          
+        }
+      })
+    })
+    
     observeEvent(input$file1, {
       updateSelectInput(session, "variable", choices = colnames(data()))
     })
