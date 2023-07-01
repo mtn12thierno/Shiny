@@ -5,7 +5,6 @@ library(ggplot2)
 library(haven)
 library(dplyr)
 library(foreign)
-library(shinyFiles)
 
 
 shinyApp(
@@ -276,6 +275,45 @@ shinyApp(
     })
     
     observeEvent(input$submit_ehcvm1,{
+      data_subset_10b <- data_10b_subset()
+      
+      if (!is.null(data_subset_10b)) {
+        ## Renaming the variables
+        new_names_10b <- c('interview_key', 'Activity', 'Product', 'Section_Code', 'Branch_Code', 'Activity_Code', 'Activity_local',
+                           'Phone_number', 'Accounting', 'Taxation_phone', 'RC_Registered', 'Person_registered', 'Legal_form',
+                           'Finance_source', 'Sold_product', 'Buy_product', 'Profit_product', 'Raw_materials_buy', 'Profit_services',
+                           'Other_CI', 'Home_spending', 'Services_fees', 'Other_spending', 'Patente', 'Taxes', 'Admin_fees')
+        
+        colnames(data_subset_10b) <- new_names_10b
+        
+        variables_avant_sold_product <- c('interview_key', 'Activity', 'Product', 'Section_Code', 'Branch_Code', 'Activity_Code',
+                                          'Activity_local', 'Phone_number', 'Accounting', 'Taxation_phone', 'RC_Registered',
+                                          'Person_registered', 'Legal_form', 'Finance_source')
+        
+        variables_apres_sold_product <- c('Sold_product', 'Buy_product', 'Profit_product', 'Raw_materials_buy', 'Profit_services',
+                                          'Other_CI', 'Home_spending', 'Services_fees', 'Other_spending', 'Patente', 'Taxes', 'Admin_fees')
+        
+        # Remplacer les valeurs manquantes par des chaînes vides pour les variables avant 'Sold_product'
+        data_subset_10b <- data_subset_10b %>%
+          mutate(across(all_of(variables_avant_sold_product), ~ ifelse(is.na(.), "", as.character(.))))
+        
+        # Remplacer les valeurs manquantes par des zéros pour les variables après 'Sold_product'
+        data_subset_10b <- data_subset_10b %>%
+          mutate(across(all_of(variables_apres_sold_product), ~ ifelse(is.na(.), 0, as.numeric(.))))
+      }
+      
+      ## Now for the 10a base
+      ## Renaming the variables
+      new_names_10a <- c('interview_key', 'Demographics', 'Study_level', 'Marital_status', 'Social_status', 'Gender',
+                         'Employment_status', 'Residence_type', 'Location_type', 'Location_size', 'Region', 'Year')
+      
+      # Replace the column names of data_10a_subset() with new_names_10a
+      data_subset_10a=data_10a_subset()
+      colnames(data_subset_10a) <- new_names_10a
+      
+      ## Merging the two datasets
+      data_10 <- merge(data_subset_10b, data_subset_10a, by = 'interview_key', all.x = TRUE)
+      data_10 <- data_10[complete.cases(data_10), ]
       c('Sold_product', 'Buy_product', 'Profit_product', 'Raw_materials_buy', 'Profit_services', 'Other_CI', 'Home_spending', 'Services_fees', 'Other_spending', 'Patente', 'Taxes', 'Admin_fees')
       
       data_10$Revenu_Non_agricole = data_10$Sold_product - data_10$Buy_product + data_10$Profit_product - data_10$Raw_materials_buy +
