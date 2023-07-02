@@ -353,8 +353,8 @@ shinyApp(
         
         ## Now for the 10a base
         ## Renaming the variables
-        new_names_10a <- c('interview_key', 'Demographics', 'Study_level', 'Marital_status', 'Social_status', 'Gender',
-                           'Employment_status', 'Residence_type', 'Location_type', 'Location_size', 'Region', 'Year')
+        new_names_10a <- c('interview_key', 's10q01', 's10q02', 's10q03', 's10q04', 's10q05',
+                           's10q06', 's10q07', 's10q08', 's10q09', 's10q10')
         
         # Replace the column names of data_10a_subset() with new_names_10a
         data_subset_10a=data_10a_subset()
